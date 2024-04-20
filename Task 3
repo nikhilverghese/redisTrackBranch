@@ -1,0 +1,63 @@
+1. Store project metadata like song keys, bpm, and date modified as Redis key values:
+Initialize:
+FLUSHALL
+
+Add attributes to the hash metadata:
+    HSET project:1:meta key "C"
+    HSET project:1:meta bpm "120"
+    HSET project:1:meta dateModified "02/05/2024"
+    INCR("projectCount")
+Get attribute:
+    HGET project:1:meta key
+Update attribute:
+    HSET project:1:meta key "D"
+Delete attribute:
+    HDEL project:1:meta key
+
+2. Cache custom notes for each project:
+Initialize:
+FLUSHALL
+
+Create note associated with project:
+    SET project:1:note:1 "this project sucks so bad"
+    SET project:1:note:2 "the vocals are pretty good actually"
+    SET project:2:note:1 "send mix to alan to fix drums"
+Read:
+    GET project:1:note:1 (Get custom note 1 for project 1)
+Update: 
+     SET project:1:note:1 "this project is so good"
+Delete:
+    DEL project:1:note:1
+
+3. Cache exported track info like location, name, and date created:
+Initialize:
+FLUSHALL
+
+Create export associated with project's attributes:
+    HSET project:1:exportVersion:1 name "Here Comes the Sun"
+    HSET project:1:exportVersion:1 location "/ableton/exports"
+    HSET project:1:exportVersion:1 dateCreated "02/02/2022"
+Read:
+    HGET project:1:exportVersion:1 name
+Update:
+    HSET project:1:exportVersion:1 name "Here Comes the Moon"
+Delete:
+    DEL project:1:exportVersion:1 name
+
+4. Cache search history of project names:
+Initialize:
+FLUSHALL
+
+Get the list of most recent search history:
+ZREVRANGE recentSearchHistory 0 -1
+
+When user searches for a project called project1, save to sortedSet:
+ZADD recentSearchHistory <timestamp> "project1"
+
+When user searches for a project called song2054, save to sortedSet:
+ZADD recentSearchHistory <timestamp> "song2054"
+
+Delete search history:
+DEL recentSearchHistory
+
+
