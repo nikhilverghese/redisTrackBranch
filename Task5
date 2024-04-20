@@ -1,0 +1,52 @@
+import { MongoClient } from "mongodb";
+import { createClient } from "redis";
+
+const client = await MongoClient.connect("mongodb://localhost:27017/");
+const coll = client.db("TrackBranch").collection("projects");
+
+const redisClient = createClient();
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
+await redisClient.connect();
+
+redisClient.FLUSHALL;
+// 1. Store project metadata
+const projects = await coll.find().toArray();
+for (const project of projects) {
+    const { _id, project_id, attributes } = project;
+    const { key, bpm, last_modified } = attributes;
+    await redisClient.hSet(`project:${project_id}:meta`, "key", key);
+    await redisClient.hSet(`project:${project_id}:meta`, "bpm", bpm.toString());
+    await redisClient.hSet(`project:${project_id}:meta`, "dateModified", last_modified);
+}
+
+// 2. Cache custom notes for each project
+for (const project of projects) {
+    const { _id, project_id, notes } = project;
+    for (let i = 0; i < notes.length; i++) {
+        const note = notes[i];
+        await redisClient.set(`project:${project_id}:note:${i + 1}`, note.message);
+    }
+}
+// 3. Cache exported track info
+for (const project of projects) {
+    const { _id, project_id, exports } = project;
+    for (let i = 0; i < exports.length; i++) {
+        const exportInfo = exports[i];
+        await redisClient.hSet(`project:${project_id}:exportVersion:${i + 1}`, "name", exportInfo.name);
+        await redisClient.hSet(`project:${project_id}:exportVersion:${i + 1}`, "location", exportInfo.location);
+        await redisClient.hSet(`project:${project_id}:exportVersion:${i + 1}`, "dateCreated", exportInfo.date_created);
+    }
+}
+// 4. Cache search history of project names
+const testSearch = ["pede", "song2054"]; // Example search history
+const timestamp = Date.now();
+for (const projectName of testSearch) {
+    await redisClient.zAdd("recentSearchHistory", {
+        score: timestamp, 
+        value: projectName});
+}
+
+console.log();
+
+await client.close();
+await redisClient.disconnect();
